@@ -7,4 +7,5 @@ mkdir build
 cd build
 cmake ..
 make
-../compareAvgTime.sh
+cd ..
+./compareAvgTime.sh
