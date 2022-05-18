@@ -35,9 +35,9 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
 
         result[index] = data1 + data2 + data3 + data4 - 4 * data0;
     }else{
-        auto global_row = blockIdx.x * blockDim.x + threadIdx.x;
+        auto global_row = blockIdx.x * blockDim.x + threadIdx.x; //hyq写反了，我也懒得改了记得x是行号就行
         auto global_col = blockIdx.y * blockDim.y + threadIdx.y;
-        auto global_block_size = col_num * TPBY;
+        auto global_block_size = col_num * TPBX;
         auto index = global_row * col_num + global_col;
 
         extern __shared__ int sdata[];
@@ -51,21 +51,41 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
         // Regular cells
         sdata[local_index] = arr_data[index];
         // up down Halo cells
-        if(threadIdx.y < RAD){
+        if(threadIdx.x < RAD){
             sdata[local_index - local_col_num] = arr_data[index - col_num];
             sdata[local_index + block_size] = arr_data[index + global_block_size];
         }
         // left right Halo cells
-        if(threadIdx.x < RAD){
-            sdata[local_index - RAD] = arr_data[index - 1];
+        if(threadIdx.y < RAD){
+            sdata[local_index - RAD] = arr_data[index - RAD];
             sdata[local_index + TPBX] = arr_data[index + TPBX];
         }
         __syncthreads();
 
         result[index] = sdata[local_index-local_col_num] + sdata[local_index+local_col_num] 
-                    + sdata[local_index-1] + sdata[local_index+1] - 4 * sdata[local_index];
+                    + sdata[local_index-1] + sdata[local_index+1] - 7 * sdata[local_index];
     }
 }
+
+__global__ void initArr(int row_num, int col_num, int *arr_data){
+    auto globalx = blockIdx.x * blockDim.x + threadIdx.x;
+    auto globaly = blockIdx.y * blockDim.y + threadIdx.y;
+    auto index = globaly * col_num + globalx;
+    arr_data[index] = 1; 
+}
+
+__global__ void checkResultr(int row_num, int col_num, int *result_data){
+    auto globalx = blockIdx.x * blockDim.x + threadIdx.x;
+    auto globaly = blockIdx.y * blockDim.y + threadIdx.y;
+    auto index = globaly * col_num + globalx;
+    if(result_data[index]!=-3){
+        if(isResultRight = true){
+            isResultRight = false;
+        }
+    }
+}
+
+__device__ bool isResultRight = true;
 
 int main() {
     int row_num = 1 << 14;
@@ -73,23 +93,29 @@ int main() {
 
     int *arr;
     int *result;
-    cudaMallocManaged(&arr, sizeof(int) * row_num * col_num);
-    cudaMallocManaged(&result, sizeof(int) * row_num * col_num);
+    cudaMalloc(&arr, sizeof(int) * row_num * col_num);
+    cudaMalloc(&result, sizeof(int) * row_num * col_num);
 
-    for (int index = 0; index < row_num * col_num; ++index) {
-        arr[index] = rand() % 1024 - 512;
-    }
+    initArr<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1)>>>(row_num, col_num, arr);
 
     cudaDeviceSynchronize();
     auto begin_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 
-    // cudaDeviceSynchronize();
+    cudaDeviceSynchronize();
     const size_t smemSize = (TPBX + 2 * RAD) * (TPBY + 2 * RAD) * sizeof(int);
     stencil<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1), smemSize>>>(row_num, col_num, arr, result);
 
-    // cudaDeviceSynchronize(); 
+    cudaDeviceSynchronize(); 
     auto end_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     printf("%ld\n", end_millis - begin_millis);
+
+    checkResult<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1)>>>(row_num, col_num, result);
+
+    if(isResultRight){
+        printf("Right Answer!!!\n");
+    }else{
+        printf("Ops!!! wrong Answer~\n");
+    }
     cudaDeviceSynchronize();
     return 0;
 }

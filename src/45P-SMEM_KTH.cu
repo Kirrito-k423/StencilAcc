@@ -11,6 +11,11 @@ using std::chrono::milliseconds;
 using std::chrono::seconds;
 using std::chrono::system_clock;
 
+#define TPBX 32
+#define TPBY 32
+#define RAD 1 // radius of the stencil
+
+
 __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
     
     if (blockIdx.x==0||blockIdx.x==511||blockIdx.y==0||blockIdx.y==511){
@@ -30,26 +35,31 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
 
         result[index] = data1 + data2 + data3 + data4 - 4 * data0;
     }else{
-        auto global_row = blockIdx.x * blockDim.x + threadIdx.x;
+        auto global_row = blockIdx.x * blockDim.x + threadIdx.x; //hyq写反了，我也懒得改了记得x是行号就行
         auto global_col = blockIdx.y * blockDim.y + threadIdx.y;
+        auto global_block_size = col_num * TPBX;
         auto index = global_row * col_num + global_col;
 
         extern __shared__ int sdata[];
         
-        auto local_row = threadIdx.x+1;
-        auto local_col = threadIdx.y+1;
-        auto local_col_num = 32 + 2;
+        auto local_row = threadIdx.x + RAD;
+        auto local_col = threadIdx.y + RAD;
+        auto local_col_num = TPBY + 2 * RAD;
+        auto block_size = TPBX * TPBY;
         auto local_index = local_row * local_col_num + local_col;
 
+        // Regular cells
         sdata[local_index] = arr_data[index];
-        // up
-        sdata[local_index-local_col_num] = arr_data[(global_row - 1) * col_num + global_col];
-        // down
-        sdata[local_index+local_col_num] = arr_data[(global_row + 1) * col_num + global_col];
-        // left
-        sdata[local_index-1] = arr_data[global_row * col_num + (global_col - 1) ];
-        // right
-        sdata[local_index+1] = arr_data[global_row * col_num + (global_col + 1) ];
+        // up down Halo cells
+        if(threadIdx.x < RAD){
+            sdata[local_index - local_col_num] = arr_data[index - col_num];
+            sdata[local_index + block_size] = arr_data[index + global_block_size];
+        }
+        // left right Halo cells
+        if(threadIdx.y < RAD){
+            sdata[local_index - RAD] = arr_data[index - RAD];
+            sdata[local_index + TPBX] = arr_data[index + TPBX];
+        }
         __syncthreads();
 
         result[index] = sdata[local_index-local_col_num] + sdata[local_index+local_col_num] 
@@ -74,9 +84,8 @@ int main() {
     auto begin_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 
     cudaDeviceSynchronize();
-    int total_numbers = row_num * col_num;
-    int block_size = 1024;
-    stencil<<<dim3(row_num / 32, col_num / 32, 1), dim3(32, 32, 1), 34*34*4>>>(row_num, col_num, arr, result);
+    const size_t smemSize = (TPBX + 2 * RAD) * (TPBY + 2 * RAD) * sizeof(int);
+    stencil<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1), smemSize>>>(row_num, col_num, arr, result);
 
     cudaDeviceSynchronize(); 
     auto end_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
