@@ -73,8 +73,8 @@ int main() {
     auto begin_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 
     cudaDeviceSynchronize();
-    int total_numbers = row_num * col_num;
-    int block_size = 1024;
+    // int total_numbers = row_num * col_num;
+    // int block_size = 1024;
     stencil<4, 32>(row_num, col_num, arr, result);
 
     cudaDeviceSynchronize(); 

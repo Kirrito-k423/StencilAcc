@@ -11,7 +11,7 @@ do
    echo "Filename: $eachfile"
    tmpSum=0
    for ((j = 0 ; j < $tryTime ; j++)); do
-        tmp=`$eachfile | awk '{print $1}'`
+        tmp=`$eachfile | awk '{if($1 ~ /^[0-9]+$/) print $1;}'`
         let "tmpSum += tmp"
         echo "  tryTime: $j: $tmp $tmpSum"
    done

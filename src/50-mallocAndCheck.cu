@@ -17,10 +17,10 @@ using std::chrono::system_clock;
 #define RAD 1 // radius of the stencil
 
 __device__ bool isResultRight = true;
+__device__ int xborderNum=(1 << ProblemSize)/TPBX-1;
+__device__ int yborderNum=(1 << ProblemSize)/TPBY-1;
 
 __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
-    auto xborderNum=(1 << ProblemSize)/TPBX-1;
-    auto yborderNum=(1 << ProblemSize)/TPBY-1;
     if (blockIdx.x==0||blockIdx.x==xborderNum||blockIdx.y==0||blockIdx.y==yborderNum){
         auto global_row = blockIdx.x * blockDim.x + threadIdx.x;
         auto global_col = blockIdx.y * blockDim.y + threadIdx.y;
@@ -38,7 +38,7 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
 
         result[index] = data1 + data2 + data3 + data4 - 7 * data0;
     }else{
-        auto global_row = blockIdx.x * blockDim.x + threadIdx.x; //hyq写反了，我也懒得改了记得x是行号就行
+        auto global_row = blockIdx.x * blockDim.x + threadIdx.x; //hyq没写错，x是行号，因为后面是在实际运行时是相邻近的
         auto global_col = blockIdx.y * blockDim.y + threadIdx.y;
         auto global_block_size = col_num * TPBX;
         auto index = global_row * col_num + global_col;
@@ -113,16 +113,13 @@ int main() {
     cudaMalloc(&result, sizeof(int) * row_num * col_num);
 
     initArr<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1)>>>(row_num, col_num, arr);
-
     cudaDeviceSynchronize();
     if(ProblemSize <= 6)
         debugPrintCudaMatrix(row_num, col_num, arr);
-    auto begin_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 
-    cudaDeviceSynchronize();
+    auto begin_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     const size_t smemSize = (TPBX + 2 * RAD) * (TPBY + 2 * RAD) * sizeof(int);
     stencil<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1), smemSize>>>(row_num, col_num, arr, result);
-
     cudaDeviceSynchronize(); 
     auto end_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     printf("%ld\n", end_millis - begin_millis);
@@ -139,7 +136,6 @@ int main() {
     }else{
         printf("Ops!!! wrong Answer~\n");
     }
-    cudaDeviceSynchronize();
     return 0;
 }
 
