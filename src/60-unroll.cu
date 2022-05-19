@@ -12,9 +12,9 @@ using std::chrono::seconds;
 using std::chrono::system_clock;
 
 #define ProblemSize 14
-#define TPBX 32
-#define TPBY 32
-#define scaleX 1
+#define TPBX 1
+#define TPBY 1024
+#define scaleX 16
 #define scaleY 1
 #define RAD 1 // radius of the stencil
 
@@ -24,21 +24,95 @@ __device__ int yborderNum=(1 << ProblemSize)/TPBY/scaleY-1;
 
 __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
     if (blockIdx.x==0||blockIdx.x==xborderNum||blockIdx.y==0||blockIdx.y==yborderNum){
-        auto global_row = blockIdx.x * blockDim.x + threadIdx.x;
-        auto global_col = blockIdx.y * blockDim.y + threadIdx.y;
-        auto index = global_row * col_num + global_col;
+        auto idxInB = threadIdx.x * TPBX + threadIdx.y
+        auto scale_row = blockIdx.x * blockDim.x * scaleX;
+        auto scale_col = blockIdx.y * blockDim.y * scaleY;
+        auto block_scale_index = scale_row * col_num + scale_col;
+        auto thread_scale_index = block_scale_index + idxInB ;
 
-        auto data0 = arr_data[index];
-        // up
-        auto data1 = arr_data[(global_row + row_num - 1) % row_num * col_num + global_col];
-        // down
-        auto data2 = arr_data[(global_row + 1) % row_num * col_num + global_col];
-        // left
-        auto data3 = arr_data[global_row * col_num + (global_col + col_num - 1) % col_num ];
-        // right
-        auto data4 = arr_data[global_row * col_num + (global_col + 1) % col_num];
+        //假设Block内线程数正好等于SMEM的列数- 2 * RAD
+        // TPBY * TPBX = local_scale_col_num - 2 * RAD
+        auto local_scale_col_num = TPBY * scaleY + 2 * RAD;
+        auto local_scale_index = 1 * local_scale_col_num + 1 + idxInB; 
 
-        result[index] = data1 + data2 + data3 + data4 - 7 * data0;
+        extern __shared__ int sdata[];
+
+        // up down Regular
+        if(blockIdx.x==0){
+            //up 
+            sdata[1+idxInB]=arr_data[(row_num-1)*col_num+scale_col+idxInB];
+            auto Regular_local_index = local_scale_index;
+            auto Regular_global_index = thread_scale_index
+            //Regular cells + down
+            for(int i = 0 ; i <= TPBX; i++ ){// 
+                sdata[Regular_local_index]=arr_data[Regular_global_index];
+                Regular_global_index += col_num;
+                Regular_local_index += local_scale_col_num;
+            }
+        }else if(blockIdx.x==xborderNum){
+            // start from up
+            auto Regular_local_index = local_scale_index - local_scale_col_num;
+            auto Regular_global_index = thread_scale_index - col_num;
+            // up + Regular cells 
+            for(int i = 0 ; i < TPBX; i++ ){// for-loop end before down line
+                sdata[Regular_local_index]=arr_data[Regular_global_index];
+                Regular_global_index += col_num;
+                Regular_local_index += local_scale_col_num;
+            }
+            sdata[Regular_local_index]=arr_data[scale_col+idxInB];
+        }else{
+            // start from up
+            auto Regular_local_index = local_scale_index - local_scale_col_num;
+            auto Regular_global_index = thread_scale_index - col_num;
+            // up + Regular cells + down
+            for(int i = 0 ; i <= TPBX; i++ ){// for-loop end in down line
+                sdata[Regular_local_index]=arr_data[Regular_global_index];
+                Regular_global_index += col_num;
+                Regular_local_index += local_scale_col_num;
+            }
+        }
+        
+
+        //left right cells
+        if(blockIdx.y==0)
+            if(idxInB < 2 * TPBX){
+                auto LR_col = idxInB%2;
+                auto LR_col_offset = LR_col * (local_scale_col_num - 1);
+                auto LR_row = idxInB/2;
+                auto LR_local_index = (LR_row + 1) * local_scale_col_num + LR_col_offset ;
+                auto LR_global_index = block_scale_index - 1 + LR_row * col_num + LR_col_offset + (1-LR_col)*(col_num);
+                sdata[LR_local_index]=arr_data[LR_global_index];
+            }
+        else if(blockIdx.y==yborderNum)
+            if(idxInB < 2 * TPBX){
+                auto LR_col = idxInB%2;
+                auto LR_col_offset = LR_col * (local_scale_col_num - 1);
+                auto LR_row = idxInB/2;
+                auto LR_local_index = (LR_row + 1) * local_scale_col_num + LR_col_offset ;
+                auto LR_global_index = block_scale_index - 1 + LR_row * col_num + LR_col_offset - (LR_col * (col_num));
+                sdata[LR_local_index]=arr_data[LR_global_index];
+            }
+        else
+            if(idxInB < 2 * TPBX){
+                auto LR_col = idxInB%2;
+                auto LR_col_offset = LR_col * (local_scale_col_num - 1);
+                auto LR_row = idxInB/2;
+                auto LR_local_index = (LR_row + 1) * local_scale_col_num + LR_col_offset ;
+                auto LR_global_index = block_scale_index - 1 + LR_row * col_num + LR_col_offset ;
+                sdata[LR_local_index]=arr_data[LR_global_index];
+            }
+        
+        __syncthreads();
+
+        Regular_local_index = local_scale_index;
+        Regular_global_index = thread_scale_index;
+        // calculate
+        for(int i = 0 ; i < TPBX; i++ ){
+            result[Regular_global_index] =  sdata[Regular_local_index - local_scale_col_num]
+                                        +   sdata[Regular_local_index - 1]
+                                    - 7 *   sdata[Regular_local_index]                                       
+                                        +   sdata[Regular_local_index + 1] 
+                                        +   sdata[Regular_local_index + local_scale_col_num] ;
     }else{
         auto idxInB = threadIdx.x * TPBX + threadIdx.y
         auto scale_row = blockIdx.x * blockDim.x * scaleX;
@@ -46,43 +120,45 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
         auto block_scale_index = scale_row * col_num + scale_col;
         auto thread_scale_index = block_scale_index + idxInB ;
 
-        //假设1024线程能被SMEM的一行存储，即SMEM一行大于1024个元素
+        //假设Block内线程数正好等于SMEM的列数- 2 * RAD
+        // TPBY * TPBX = local_scale_col_num - 2 * RAD
         auto local_scale_col_num = TPBY * scaleY + 2 * RAD;
         auto local_scale_index = 1 * local_scale_col_num + 1 + idxInB; 
 
-        // to do
-        auto global_row = blockIdx.x * blockDim.x * scaleX + threadIdx.x; //hyq没写错，x是行号，因为后面是在实际运行时是相邻近的
-        auto global_col = blockIdx.y * blockDim.y * scaleY + threadIdx.y;
-        auto index = global_row * col_num + global_col; //scaleX*scaleY个大块的第一个元素
-
         extern __shared__ int sdata[];
-        
-        auto local_row = threadIdx.x + RAD;
-        auto local_col = threadIdx.y + RAD;
-        auto local_col_num = TPBY + 2 * RAD;
-        auto local_index = local_row * local_col_num + local_col;
 
-        // Regular cells
-        sdata[local_index] = arr_data[index];
-        // up
-        if(local_row==1)
-            sdata[local_index - local_col_num] = arr_data[index - col_num];
-        // down
-        if(local_row==TPBX)
-            sdata[local_index + local_col_num] = arr_data[index + col_num];
-        // left
-        if(local_col==1)
-            sdata[local_index - 1] = arr_data[index - 1];
-        // right
-        if(local_col==TPBY)
-            sdata[local_index + 1] = arr_data[index + 1];
+        // start from up
+        auto Regular_local_index = local_scale_index - local_scale_col_num;
+        auto Regular_global_index = thread_scale_index - col_num;
+        // up + Regular cells + down
+        for(int i = 0 ; i <= TPBX; i++ ){// for-loop end in down line
+            sdata[Regular_local_index]=arr_data[Regular_global_index];
+            Regular_global_index += col_num;
+            Regular_local_index += local_scale_col_num;
+        }
+
+        //left right cells
+        if(idxInB < 2 * TPBX){
+            auto LR_col = idxInB%2;
+            auto LR_col_offset = LR_col * (local_scale_col_num - 1);
+            auto LR_row = idxInB/2;
+            auto LR_local_index = (LR_row + 1) * local_scale_col_num + LR_col_offset ;
+            auto LR_global_index = block_scale_index - 1 + LR_row * col_num + LR_col_offset ;
+            sdata[LR_local_index]=arr_data[LR_global_index];
+        }
+        
         __syncthreads();
 
-        result[index] = sdata[local_index - local_col_num]
-                    +   sdata[local_index + local_col_num] 
-                    +   sdata[local_index - 1]
-                    +   sdata[local_index + 1] 
-                - 7 *   sdata[local_index];
+        Regular_local_index = local_scale_index;
+        Regular_global_index = thread_scale_index;
+        // calculate
+        for(int i = 0 ; i < TPBX; i++ ){
+            result[Regular_global_index] =  sdata[Regular_local_index - local_scale_col_num]
+                                        +   sdata[Regular_local_index - 1]
+                                    - 7 *   sdata[Regular_local_index]                                       
+                                        +   sdata[Regular_local_index + 1] 
+                                        +   sdata[Regular_local_index + local_scale_col_num] ;
+                                    
     }
 }
 

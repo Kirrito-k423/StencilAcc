@@ -24,13 +24,17 @@ __global__ void stencil_kernel(int row_num, int col_num, int *arr_data, int *res
     mem[0][1 + threadIdx.y][1 + threadIdx.x] = arr_data[row_num * boundy1 + boundx1];
 
     if (threadIdx.y == 0) {
-        mem[0][0][1 + threadIdx.x] = arr_data[std::min(std::max((int)blockIdx.y * chunksize - iters - 1, 0), col_num - 1) * col_num + boundx1];
-        mem[0][1 + blocksize][1 + threadIdx.x] = arr_data[std::min(std::max((int)blockIdx.y * chunksize - iters + blocksize, 0), col_num - 1) * col_num + boundx1];
+        mem[0][0][1 + threadIdx.x] 
+        = arr_data[std::min(std::max((int)blockIdx.y * chunksize - iters - 1        , 0), col_num - 1) * col_num + boundx1];
+        mem[0][1 + blocksize][1 + threadIdx.x] 
+        = arr_data[std::min(std::max((int)blockIdx.y * chunksize - iters + blocksize, 0), col_num - 1) * col_num + boundx1];
     }
 
     if (threadIdx.x == 0) {
-        mem[0][1 + threadIdx.y][0] = arr_data[std::min(std::max((int)blockIdx.x * chunksize - iters - 1, 0), row_num - 1) + row_num * boundy1];
-        mem[0][1 + threadIdx.y][1 + blocksize] = arr_data[std::min(std::max((int)blockIdx.x * chunksize - iters + blocksize, 0),row_num - 1) + row_num * boundy1];
+        mem[0][1 + threadIdx.y][0] 
+        = arr_data[std::min(std::max((int)blockIdx.x * chunksize - iters - 1         , 0), row_num - 1) + row_num * boundy1];
+        mem[0][1 + threadIdx.y][1 + blocksize] 
+        = arr_data[std::min(std::max((int)blockIdx.x * chunksize - iters + blocksize , 0), row_num - 1) + row_num * boundy1];
     }
 
     __syncthreads();
