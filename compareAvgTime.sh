@@ -2,7 +2,7 @@
 
 set -e
 # set -v
-tryTime=2
+tryTime=3
 shPath=`pwd`
 fileDir="./build/bin"
 
@@ -14,6 +14,7 @@ isBaseline1=1
 # baseline0=0
 # baseline1=0
 
+rm -rf exeName.log
 rm -rf time0.log
 rm -rf time1.log
 rm -rf stepAcc0.log
@@ -25,6 +26,7 @@ for eachfile in "$fileDir"/*
 do
    if [[ $eachfile =~ $filterNeed ]]; then
       echo "Filename: $eachfile"
+      echo "$eachfile" >> exeName.log
       tmpSum=0
       for ((j = 0 ; j < $tryTime ; j++)); do
          tmp=`$eachfile | awk '{if($1 ~ /^[0-9]+$/) print $1;}'`
@@ -52,6 +54,7 @@ do
          echo "$totalAcc" >> totalAcc0.log
       else
          # echo "   Not match Suffix!"
+         echo "$eachfile" >> exeName.log
          if [[ $isBaseline1 == 1 ]]; then
             echo "   write baseline 1"
             baseline1=$avg
