@@ -5,7 +5,6 @@
 #include <thrust/host_vector.h>
 /* #include <thrust/universal_vector.h> */
 #include <chrono>
-#include <nvToolsExt.h>
 
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
@@ -16,16 +15,16 @@ using std::chrono::system_clock;
 // #define ProblemSize 5
 // #define TPBX 1
 // #define TPBY 8
-// #define scaleX 4    
+// #define scaleX 3    
 // #define scaleY 1
 // #define RAD 1 // radius of the stencil
 
 // 必须是2的倍数
 #define ProblemSize 14
-#define TPBX 1
+#define TPBX 2
 #define TPBY 512
-#define scaleX 16
-#define scaleY 1
+#define scaleX 8
+#define scaleY 1 //当前假设下为1
 #define RAD 1 // radius of the stencil
 
 __device__ bool isResultRight = true;
@@ -40,9 +39,9 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
         auto block_scale_index = scale_row * col_num + scale_col;
         auto thread_scale_index = block_scale_index + idxInB ;
 
-        //假设Block内线程数正好等于SMEM的列数- 2 * RAD
-        // TPBY * TPBX = local_scale_col_num - 2 * RAD = TPBY * scaleY
-        // TPBX = scaleY
+        //假设Block内Y线程数正好等于SMEM的列数- 2 * RAD
+        // TPBY = local_scale_col_num - 2 * RAD = TPBY * scaleY
+        // 1 = scaleY
         auto local_scale_col_num = TPBY * scaleY + 2 * RAD;
         auto local_scale_index = 1 * local_scale_col_num + 1 + idxInB; 
 
@@ -215,26 +214,20 @@ int main() {
     cudaMalloc(&arr, sizeof(int) * row_num * col_num);
     cudaMalloc(&result, sizeof(int) * row_num * col_num);
 
-    nvtxRangePush("initArr");
     initArr<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1)>>>(row_num, col_num, arr);
     cudaDeviceSynchronize();
-    nvtxRangePop();
     if(ProblemSize <= 6)
         debugPrintCudaMatrix(row_num, col_num, arr);
 
     auto begin_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     const size_t smemSize = (TPBX * scaleX + 2 * RAD) * (TPBY * scaleY + 2 * RAD) * sizeof(int);
-    nvtxRangePush("stencil");
     stencil<<<dim3(row_num / TPBX / scaleX , col_num / TPBY / scaleY , 1), dim3(TPBX, TPBY, 1), smemSize>>>(row_num, col_num, arr, result);
     cudaDeviceSynchronize(); 
-    nvtxRangePop();
     auto end_millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     printf("%ld\n", end_millis - begin_millis);
 
-    nvtxRangePush("checkResult");
     checkResult<<<dim3(row_num / TPBX, col_num / TPBY, 1), dim3(TPBX, TPBY, 1)>>>(row_num, col_num, result);
     cudaDeviceSynchronize(); 
-    nvtxRangePop();
     if(ProblemSize <= 6)
         debugPrintCudaMatrix(row_num, col_num, result);
     bool isResultRightHost;

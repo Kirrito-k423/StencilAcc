@@ -143,6 +143,7 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
         auto Regular_local_index = local_scale_index - local_scale_col_num;
         auto Regular_global_index = thread_scale_index - col_num;
         // up + Regular cells + down
+        #pragma unroll
         for(int i = 0 ; i <= scaleX + 1; i++ ){// for-loop end in down line
             sdata[Regular_local_index]=arr_data[Regular_global_index];
             Regular_global_index += col_num;
@@ -164,6 +165,7 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
         Regular_local_index = local_scale_index;
         Regular_global_index = thread_scale_index;
         // calculate
+        #pragma unroll
         for(int i = 0 ; i < scaleX; i++ ){
             result[Regular_global_index] =  sdata[Regular_local_index - local_scale_col_num]
                                         +   sdata[Regular_local_index - 1]

@@ -145,6 +145,7 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
         // up + Regular cells + down
         for(int i = 0 ; i <= scaleX + 1; i++ ){// for-loop end in down line
             sdata[Regular_local_index]=arr_data[Regular_global_index];
+            __syncthreads();
             Regular_global_index += col_num;
             Regular_local_index += local_scale_col_num;
         }
