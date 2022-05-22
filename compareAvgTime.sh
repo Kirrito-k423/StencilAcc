@@ -26,7 +26,6 @@ for eachfile in "$fileDir"/*
 do
    if [[ $eachfile =~ $filterNeed ]]; then
       echo "Filename: $eachfile"
-      echo "$eachfile" >> exeName.log
       tmpSum=0
       for ((j = 0 ; j < $tryTime ; j++)); do
          tmp=`$eachfile | awk '{if($1 ~ /^[0-9]+$/) print $1;}'`
