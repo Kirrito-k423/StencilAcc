@@ -28,10 +28,15 @@ foreach (file ${files})
 	add_executable(${exe} ${file})
 	target_link_libraries(${exe} nvToolsExt)
 	target_include_directories(${exe} PUBLIC /usr/local/cuda/samples/common/inc)
-    # target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda
-    #     -G -src-in-ptx
-    #     >)
-    target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+    target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+			-g
+        	-G 
+			-src-in-ptx
+        >)
+	target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+		--extended-lambda
+		--expt-relaxed-constexpr
+	>)
 endforeach ()
 # 4.2.3.2. --debug (-g)
 # Generate debug information for host code.
@@ -39,9 +44,14 @@ endforeach ()
 # 4.2.3.3. --device-debug (-G)
 # Generate debug information for device code.
 
+# --source-in-ptx (-src-in-ptx)
+# Interleave source in PTX.
+
+# May only be used in conjunction with --device-debug or --generate-line-info.
+
 file(GLOB files "src/*.cu")
 foreach (file ${files})
-	set(CMAKE_CUDA_FLAGS "${CUDA_NVCC_FLAGS} -Xptxas -O3 -v --use_fast_math") # old way
+	# set(CMAKE_CUDA_FLAGS "${CUDA_NVCC_FLAGS} -Xptxas -O3 -v --use_fast_math") # old way: 原因是这个是全局的设置，会影响所有exe
 	message(STATUS "file is ${file}")
 	string(REGEX REPLACE ".+/(.+)\\..*" "\\1" exe ${file})
 	set(exe ${exe}_flags)
@@ -49,11 +59,25 @@ foreach (file ${files})
 	add_executable(${exe} ${file})
 	target_link_libraries(${exe} nvToolsExt)
 	target_include_directories(${exe} PUBLIC /usr/local/cuda/samples/common/inc)
-    # target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda
-    #     -G -src-in-ptx
+	target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+        	-Xptxas 
+			-O3 
+			-v 
+			--use_fast_math
+	>)
+    # target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+    #     	-G 
+	#		-src-in-ptx
     #     >)
-    target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+    target_compile_options(${exe}  PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+		--extended-lambda
+		--expt-relaxed-constexpr
+	>)
 endforeach ()
+
+
+# --extended-lambda (-extended-lambda)
+# Allow __host__, __device__ annotations in lambda declarations.
 
 # --expt-relaxed-constexpr (-expt-relaxed-constexpr)
 # Experimental flag: Allow host code to invoke __device__constexpr functions, and device code to invoke __host__constexpr functions.
