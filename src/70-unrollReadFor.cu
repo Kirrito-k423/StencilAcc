@@ -204,8 +204,8 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
             Regular_global_index += col_num;
             Regular_local_index += local_scale_col_num;
             sdata[Regular_local_index]=arr_data[Regular_global_index];
-            Regular_global_index += col_num;
-            Regular_local_index += local_scale_col_num;
+            // Regular_global_index += col_num;
+            // Regular_local_index += local_scale_col_num;
         }
         
 
@@ -232,16 +232,7 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
                                     +   sdata[Regular_local_index + 1] 
                                     +   sdata[Regular_local_index + local_scale_col_num] ;
         Regular_global_index += col_num;
-        Regular_local_index += local_scale_col_num;
-        if(scaleX > 2){
-            result[Regular_global_index] =  sdata[Regular_local_index - local_scale_col_num]
-                        +   sdata[Regular_local_index - 1]
-                    - 7 *   sdata[Regular_local_index]                                       
-                        +   sdata[Regular_local_index + 1] 
-                        +   sdata[Regular_local_index + local_scale_col_num] ;
-            Regular_global_index += col_num;
-            Regular_local_index += local_scale_col_num;
-        }     
+        Regular_local_index += local_scale_col_num; 
         if(scaleX >= 2){
             result[Regular_global_index] =  sdata[Regular_local_index - local_scale_col_num]
                         +   sdata[Regular_local_index - 1]
@@ -352,8 +343,8 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
                     - 7 *   sdata[Regular_local_index]                                       
                         +   sdata[Regular_local_index + 1] 
                         +   sdata[Regular_local_index + local_scale_col_num] ;
-            Regular_global_index += col_num;
-            Regular_local_index += local_scale_col_num;
+            // Regular_global_index += col_num;
+            // Regular_local_index += local_scale_col_num;
         }  
     }
 }
