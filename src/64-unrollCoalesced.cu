@@ -35,9 +35,9 @@ __device__ int yborderNum=(1 << ProblemSize)/TPBY/scaleY-1;
 __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
     if (blockIdx.x==0||blockIdx.x==xborderNum||blockIdx.y==0||blockIdx.y==yborderNum){
         if(threadIdx.y < TPBY){
-            auto idxInB = threadIdx.x * TPBY + threadIdx.y;
+            auto idxInB = 0 * TPBY + threadIdx.y;
             auto scale_row = blockIdx.x * blockDim.x * scaleX;
-            auto scale_col = blockIdx.y * blockDim.y * scaleY;
+            auto scale_col = blockIdx.y * (blockDim.y-2*RAD) * scaleY;
             auto block_scale_index = scale_row * col_num + scale_col;
             auto thread_scale_index = block_scale_index + idxInB ;
 
@@ -130,7 +130,7 @@ __global__ void stencil(int row_num, int col_num, int *arr_data, int *result) {
     }else{
         auto idxInB = 0 * TPBY + threadIdx.y;
         auto scale_row = blockIdx.x * blockDim.x * scaleX;
-        auto scale_col = blockIdx.y * blockDim.y * scaleY;
+        auto scale_col = blockIdx.y * (blockDim.y-2*RAD) * scaleY;
         auto block_scale_index = scale_row * col_num + scale_col;
         auto thread_scale_index = block_scale_index + idxInB - RAD;
 
