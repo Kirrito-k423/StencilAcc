@@ -7,7 +7,7 @@ shPath=`pwd`
 fileDir="./build/bin"
 
 # filterNeed="."
-filterNeed="$fileDir/((1|2|3|5|6|7).*)|(45P.*)"
+filterNeed="$fileDir/((0|1|2|3|5|6|7).*)|(45P.*)"
 judgeFileNameSuffix=".*flags"
 isBaseline0=1
 isBaseline1=1

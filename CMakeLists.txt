@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Release)
+# set(CMAKE_BUILD_TYPE Release)
 #set(CMAKE_CUDA_ARCHITECTURES 61)
 
 
@@ -81,3 +81,35 @@ endforeach ()
 
 # --expt-relaxed-constexpr (-expt-relaxed-constexpr)
 # Experimental flag: Allow host code to invoke __device__constexpr functions, and device code to invoke __host__constexpr functions.
+
+set(CMAKE_CXX_COMPILER g++)
+find_package(OpenMP)
+set(CMAKE_CXX_FLAGS "-pthread -fopenmp") # 把release的 -O3 -DNDEBUG覆盖掉
+
+file(GLOB files "src/*.cpp")
+foreach (file ${files})
+	message(STATUS "file is ${file}")
+	string(REGEX REPLACE ".+/(.+)\\..*" "\\1" exe ${file})
+	set(exe ${exe})
+	message(STATUS "file name is ${exe}")
+	add_executable(${exe} ${file})
+	target_compile_options(${exe}  PRIVATE
+		-pthread 
+		-fopenmp
+	>)
+endforeach ()
+
+
+file(GLOB files "src/*.cpp")
+foreach (file ${files})
+	message(STATUS "file is ${file}")
+	string(REGEX REPLACE ".+/(.+)\\..*" "\\1" exe ${file})
+	set(exe ${exe}_flags)
+	message(STATUS "file name is ${exe}")
+	add_executable(${exe} ${file})
+	target_compile_options(${exe}  PRIVATE
+			-O3 
+			-pthread 
+			-fopenmp
+	>)
+endforeach ()
